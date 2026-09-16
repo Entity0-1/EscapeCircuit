@@ -1,0 +1,11 @@
+Model Information:
+* title:	Fly Swatter
+* source:	https://sketchfab.com/3d-models/fly-swatter-1cbb42b179424bcc8d051e7363e3829d
+* author:	reconpeanut (https://sketchfab.com/reconpeanut)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Fly Swatter" (https://sketchfab.com/3d-models/fly-swatter-1cbb42b179424bcc8d051e7363e3829d) by reconpeanut (https://sketchfab.com/reconpeanut) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -3,7 +3,7 @@
 The new animated “Housefly” is CC BY 4.0. The public packages retain
 `THIRD_PARTY_NOTICES.md`; do not upload the separate restricted fly backup
 from outside this project. The fly, MaleCNS data, and apartment all require
-CC BY 4.0 attribution.
+CC BY 4.0 attribution. The swatter model also requires attribution.
 
 ## Copy into a game page or video description
 
@@ -23,6 +23,11 @@ CC BY 4.0 attribution.
 > CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ . Adapted for
 > Escape Circuit: display pedestal omitted, body reoriented, and wing
 > geometry separated and animated during flight and replay.
+>
+> Swatter art: “Fly Swatter” by reconpeanut —
+> https://sketchfab.com/3d-models/fly-swatter-1cbb42b179424bcc8d051e7363e3829d —
+> CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ . Scaled and
+> reoriented for the first-person view; gameplay hit area unchanged.
 
 ## Release steps
 

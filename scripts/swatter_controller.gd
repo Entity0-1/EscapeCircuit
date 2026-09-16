@@ -21,6 +21,7 @@ const VIEW_STRIKE_OFFSET := Vector3(0.02, 0.02, -0.96)
 const VIEW_READY_ROTATION := Vector3(PI / 2.0 - 0.10, -0.10, 0.34)
 const VIEW_WINDUP_ROTATION := Vector3(PI / 2.0 - 0.24, -0.20, 0.12)
 const VIEW_STRIKE_ROTATION := Vector3(PI / 2.0 + 0.12, 0.04, -0.06)
+const SWATTER_MODEL := preload("res://assets/models/swatter_ccby/scene.gltf")
 
 var phase := Phase.READY
 var phase_time := 0.0
@@ -32,6 +33,7 @@ var vertical_speed := 0.0
 var previous_height := 3.0
 var model_root: Node3D
 var paddle_root: Node3D
+var imported_model: Node3D
 var view_camera: Camera3D
 
 
@@ -165,25 +167,19 @@ func _build_model() -> void:
 
 	paddle_root = Node3D.new()
 	paddle_root.name = "Paddle"
+	paddle_root.rotation.y = 0.34
 	model_root.add_child(paddle_root)
 
-	var frame_material := _material(Color("e1683c"), 0.42, 0.12)
-	var grip_material := _material(Color("242b32"), 0.72, 0.02)
-	var mesh_material := _material(Color(0.93, 0.36, 0.21, 0.78), 0.38, 0.08, true)
-
-	_add_box(paddle_root, Vector3(1.58, 0.075, 0.075), Vector3(0.0, 0.0, -0.64), frame_material)
-	_add_box(paddle_root, Vector3(1.58, 0.075, 0.075), Vector3(0.0, 0.0, 0.64), frame_material)
-	_add_box(paddle_root, Vector3(0.075, 0.075, 1.28), Vector3(-0.79, 0.0, 0.0), frame_material)
-	_add_box(paddle_root, Vector3(0.075, 0.075, 1.28), Vector3(0.79, 0.0, 0.0), frame_material)
-
-	for x_index in range(-5, 6):
-		_add_box(paddle_root, Vector3(0.018, 0.025, 1.18), Vector3(x_index * 0.13, 0.0, 0.0), mesh_material)
-	for z_index in range(-4, 5):
-		_add_box(paddle_root, Vector3(1.48, 0.025, 0.018), Vector3(0.0, 0.0, z_index * 0.13), mesh_material)
-
-	var handle_joint := Vector3(0.34, -0.58, 1.06)
-	_add_handle_segment(model_root, Vector3(0.0, -0.02, 0.58), handle_joint, 0.065, frame_material)
-	_add_handle_segment(model_root, handle_joint, Vector3(0.62, -0.96, 1.48), 0.095, grip_material)
+	imported_model = SWATTER_MODEL.instantiate() as Node3D
+	imported_model.name = "FlySwatterArt"
+	paddle_root.add_child(imported_model)
+	# The source mesh is upright in XY after its glTF root transform. Center its
+	# paddle on the old visual origin and run the handle along local +Z, which
+	# the unchanged first-person pose points down toward the player's hand.
+	imported_model.transform = Transform3D(
+		Basis(Vector3(0.065, 0.0, 0.0), Vector3(0.0, 0.0, -0.040), Vector3(0.0, 0.040, 0.0)),
+		Vector3(-0.276, -0.728, -0.160)
+	)
 
 
 func _update_view_model(delta: float) -> void:
@@ -218,43 +214,3 @@ func _get_view_transform() -> Transform3D:
 			rotation_value = VIEW_STRIKE_ROTATION.lerp(VIEW_READY_ROTATION, pose_amount)
 	var local_basis := Basis.from_euler(rotation_value).scaled(Vector3.ONE * VIEW_SCALE)
 	return view_camera.global_transform * Transform3D(local_basis, offset)
-
-
-func _add_box(parent: Node3D, size: Vector3, position_value: Vector3, material: Material) -> MeshInstance3D:
-	var instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	instance.mesh = mesh
-	instance.position = position_value
-	instance.material_override = material
-	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	parent.add_child(instance)
-	return instance
-
-
-func _add_handle_segment(parent: Node3D, from: Vector3, to: Vector3, radius: float, material: Material) -> MeshInstance3D:
-	var segment := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = from.distance_to(to)
-	mesh.radial_segments = 10
-	segment.mesh = mesh
-	segment.position = (from + to) * 0.5
-	segment.material_override = material
-	segment.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	segment.look_at_from_position(segment.position, to, Vector3.FORWARD)
-	segment.rotate_object_local(Vector3.RIGHT, PI / 2.0)
-	parent.add_child(segment)
-	return segment
-
-
-func _material(color: Color, roughness: float, metallic: float, transparent := false) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = roughness
-	material.metallic = metallic
-	if transparent:
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return material

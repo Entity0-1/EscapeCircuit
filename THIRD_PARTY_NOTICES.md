@@ -30,6 +30,12 @@ The project documentation refers to public connectome projects for comparison an
 
 The game omits the model's display pedestal, scales and reorients the fly, separates its original transparent wing geometry into two pivots, and animates the wings during flight and replay. Credit the author and link the model and license in any public game page, repository, or video description, and indicate these changes. The earlier Personal Use License fly and CC0 scan are not part of the runtime model.
 
+## Fly swatter model
+
+“Fly Swatter” by [reconpeanut](https://sketchfab.com/reconpeanut) is included under [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/). Original model: [Sketchfab listing](https://sketchfab.com/3d-models/fly-swatter-1cbb42b179424bcc8d051e7363e3829d). The supplied archive's `license.txt`, glTF geometry, and binary buffer are at `assets/models/swatter_ccby/`.
+
+The model is scaled and reoriented for the first-person view. Its visual geometry does not determine the swatter's gameplay hit area. Credit the author and link the model and license in any public game page, repository, or video description, and indicate these changes.
+
 ## Modern Apartment
 
 “Modern Apartment” by [Visthétique](https://sketchfab.com/visthetique) is included under [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/). Original model: [Sketchfab listing](https://sketchfab.com/3d-models/modern-apartment-1fbb649cd6624f2bb7b7d6e30c6533a5). The supplied archive contains its original `license.txt`, glTF geometry, and textures at `assets/models/apartment/modern_apartment/`.

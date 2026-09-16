@@ -509,8 +509,15 @@ func _test_swatter_uses_first_person_pose(game) -> void:
 	game._start_round()
 	game.swatter.reset_swatter()
 	game.swatter._process(1.0 / 60.0)
+	_assert(is_instance_valid(game.swatter.imported_model), "credited swatter glTF model is active")
+	_assert(game.swatter.paddle_root.get_child_count() == 1, "only the imported swatter is drawn")
+	var swatter_mesh := _find_first_mesh(game.swatter.imported_model)
+	_assert(swatter_mesh != null, "imported swatter contains rendered geometry")
+	if swatter_mesh == null:
+		return
 	var camera_local_position: Vector3 = game.camera.to_local(game.swatter.model_root.global_position)
-	var grip_local_position: Vector3 = game.camera.to_local(game.swatter.model_root.to_global(Vector3(0.62, -0.96, 1.48)))
+	# The imported source's handle ends near this mesh-local position.
+	var grip_local_position: Vector3 = game.camera.to_local(swatter_mesh.to_global(Vector3(-18.2, -4.25, -65.0)))
 	var face_normal: Vector3 = game.swatter.model_root.global_basis.y.normalized()
 	var camera_back: Vector3 = game.camera.global_basis.z.normalized()
 	_assert(camera_local_position.x > 0.0, "swatter is carried on the player's right side")
@@ -523,6 +530,16 @@ func _test_swatter_uses_first_person_pose(game) -> void:
 	game.swatter.previous_height = 1.60
 	_assert(game.swatter.contains_world_point(game.swatter.global_position), "first-person pose does not move the strike center")
 	_assert(not game.swatter.contains_world_point(game.swatter.global_position + Vector3(0.40, 0.0, 0.0)), "first-person pose does not widen the strike area")
+
+
+func _find_first_mesh(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node as MeshInstance3D
+	for child in node.get_children():
+		var found := _find_first_mesh(child)
+		if found != null:
+			return found
+	return null
 
 
 func _test_timeout(game) -> void:

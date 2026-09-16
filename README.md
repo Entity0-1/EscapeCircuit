@@ -76,7 +76,7 @@ The script tests the project and creates:
 - `dist/Escape-Circuit-web.zip` — upload to itch.io as an HTML project for free and select “This file will be played in the browser.”
 - `dist/Escape-Circuit-windows-x86_64.zip` — offer as a Windows download on itch.io or use its executable for a future Steam build.
 
-The shipped fly is “Housefly” by schmoldt.art under CC BY 4.0. Its original wings are separated and animated in Godot; the earlier Personal Use License fly is not shipped. The apartment and MaleCNS-derived circuit also remain CC BY 4.0. Before publishing a game page or video description, credit all three sources with their model/data and license links and note the gameplay adaptations; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The release script copies the notices into both builds.
+The shipped fly is “Housefly” by schmoldt.art under CC BY 4.0. Its original wings are separated and animated in Godot; the earlier Personal Use License fly is not shipped. The apartment, “Fly Swatter” model by reconpeanut, and MaleCNS-derived circuit also remain CC BY 4.0. Before publishing a game page or video description, credit all four sources with their model/data and license links and note the gameplay adaptations; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The release script copies the notices into both builds.
 
 Use the ready-to-copy credit text and release checklist in [docs/publishing.md](docs/publishing.md). The web export is large, even after preserving apartment texture resolution with high-quality lossy import; test its loading time and frame rate in a real browser before making the page public.
 
