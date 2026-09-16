@@ -1,0 +1,287 @@
+{
+  "dataset": {
+    "annotations_sha256": "2177e246113e4cfbf1e7772ec37c6da1955ff22e8063d0b1f833101f99a9a3b2",
+    "edges_sha256": "e35da783d1c686b2b58b3b87cd6a403ae43bfcfba8bff28e08ef752c1a56afc1",
+    "id": "malecns-v1.0",
+    "license": "CC-BY-4.0",
+    "release": "v1.0",
+    "source_page": "https://male-cns.janelia.org/download/"
+  },
+  "model_boundary": {
+    "claim": "A compact game controller weighted by observed MaleCNS looming-to-descending connectivity; not a whole-brain emulation.",
+    "engineered": "Game-to-neuron stimulus encoding, rate dynamics, normalization, thresholds, action decoding, and body motion.",
+    "observed": "Neuron identities, sides, direct connections, and synaptic contact counts."
+  },
+  "name": "MaleCNS v1.0 looming-to-escape direct circuit",
+  "observed_aggregates": [
+    {
+      "connection_rows": 71,
+      "source_side": "L",
+      "source_type": "LC4",
+      "synaptic_contacts": 3782,
+      "target_side": "L",
+      "target_type": "DNp01"
+    },
+    {
+      "connection_rows": 94,
+      "source_side": "L",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 2642,
+      "target_side": "L",
+      "target_type": "DNp01"
+    },
+    {
+      "connection_rows": 55,
+      "source_side": "R",
+      "source_type": "LC4",
+      "synaptic_contacts": 2580,
+      "target_side": "R",
+      "target_type": "DNp01"
+    },
+    {
+      "connection_rows": 91,
+      "source_side": "R",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 2220,
+      "target_side": "R",
+      "target_type": "DNp01"
+    },
+    {
+      "connection_rows": 71,
+      "source_side": "L",
+      "source_type": "LC4",
+      "synaptic_contacts": 2279,
+      "target_side": "L",
+      "target_type": "DNp02"
+    },
+    {
+      "connection_rows": 54,
+      "source_side": "R",
+      "source_type": "LC4",
+      "synaptic_contacts": 1930,
+      "target_side": "R",
+      "target_type": "DNp02"
+    },
+    {
+      "connection_rows": 4,
+      "source_side": "R",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 5,
+      "target_side": "R",
+      "target_type": "DNp02"
+    },
+    {
+      "connection_rows": 71,
+      "source_side": "L",
+      "source_type": "LC4",
+      "synaptic_contacts": 1827,
+      "target_side": "L",
+      "target_type": "DNp03"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "L",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 1,
+      "target_side": "L",
+      "target_type": "DNp03"
+    },
+    {
+      "connection_rows": 55,
+      "source_side": "R",
+      "source_type": "LC4",
+      "synaptic_contacts": 680,
+      "target_side": "R",
+      "target_type": "DNp03"
+    },
+    {
+      "connection_rows": 71,
+      "source_side": "L",
+      "source_type": "LC4",
+      "synaptic_contacts": 6811,
+      "target_side": "L",
+      "target_type": "DNp04"
+    },
+    {
+      "connection_rows": 94,
+      "source_side": "L",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 1957,
+      "target_side": "L",
+      "target_type": "DNp04"
+    },
+    {
+      "connection_rows": 55,
+      "source_side": "R",
+      "source_type": "LC4",
+      "synaptic_contacts": 4786,
+      "target_side": "R",
+      "target_type": "DNp04"
+    },
+    {
+      "connection_rows": 91,
+      "source_side": "R",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 1441,
+      "target_side": "R",
+      "target_type": "DNp04"
+    },
+    {
+      "connection_rows": 70,
+      "source_side": "L",
+      "source_type": "LC4",
+      "synaptic_contacts": 705,
+      "target_side": "L",
+      "target_type": "DNp06"
+    },
+    {
+      "connection_rows": 91,
+      "source_side": "L",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 886,
+      "target_side": "L",
+      "target_type": "DNp06"
+    },
+    {
+      "connection_rows": 55,
+      "source_side": "R",
+      "source_type": "LC4",
+      "synaptic_contacts": 447,
+      "target_side": "R",
+      "target_type": "DNp06"
+    },
+    {
+      "connection_rows": 88,
+      "source_side": "R",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 833,
+      "target_side": "R",
+      "target_type": "DNp06"
+    },
+    {
+      "connection_rows": 69,
+      "source_side": "L",
+      "source_type": "LC4",
+      "synaptic_contacts": 2022,
+      "target_side": "L",
+      "target_type": "DNp11"
+    },
+    {
+      "connection_rows": 26,
+      "source_side": "L",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 56,
+      "target_side": "L",
+      "target_type": "DNp11"
+    },
+    {
+      "connection_rows": 53,
+      "source_side": "R",
+      "source_type": "LC4",
+      "synaptic_contacts": 1644,
+      "target_side": "R",
+      "target_type": "DNp11"
+    },
+    {
+      "connection_rows": 13,
+      "source_side": "R",
+      "source_type": "LPLC2",
+      "synaptic_contacts": 15,
+      "target_side": "R",
+      "target_type": "DNp11"
+    }
+  ],
+  "references": [
+    "https://male-cns.janelia.org/download/",
+    "https://github.com/flyconnectome/2025malecns",
+    "https://doi.org/10.1016/j.cell.2026.08.015",
+    "https://doi.org/10.1038/s41586-022-05562-8",
+    "https://doi.org/10.1038/s41586-025-09037-4"
+  ],
+  "schema_version": 1,
+  "selection": {
+    "minimum_edge_weight": 1,
+    "observed_connection_rows": 1343,
+    "observed_synaptic_contacts": 39549,
+    "source_types": [
+      "LPLC2",
+      "LC4"
+    ],
+    "target_superclass": "descending_neuron",
+    "target_types": [
+      {
+        "modeled_role": "fast_escape_takeoff",
+        "type": "DNp01"
+      },
+      {
+        "modeled_role": "directional_escape",
+        "type": "DNp02"
+      },
+      {
+        "modeled_role": "collision_avoidance_flight_saccade",
+        "type": "DNp03"
+      },
+      {
+        "modeled_role": "directional_escape",
+        "type": "DNp04"
+      },
+      {
+        "modeled_role": "evasive_maneuver",
+        "type": "DNp06"
+      },
+      {
+        "modeled_role": "directional_escape",
+        "type": "DNp11"
+      }
+    ]
+  },
+  "source_neuron_counts": [
+    {
+      "count": 71,
+      "side": "L",
+      "type": "LC4"
+    },
+    {
+      "count": 55,
+      "side": "R",
+      "type": "LC4"
+    },
+    {
+      "count": 94,
+      "side": "L",
+      "type": "LPLC2"
+    },
+    {
+      "count": 91,
+      "side": "R",
+      "type": "LPLC2"
+    }
+  ],
+  "source_report_sha256": "25b0da92394c721ae592f0ef8391bdd3f4e109d23939f7d62df8b1725971fa50",
+  "target_contact_totals": [
+    {
+      "synaptic_contacts": 11224,
+      "type": "DNp01"
+    },
+    {
+      "synaptic_contacts": 4214,
+      "type": "DNp02"
+    },
+    {
+      "synaptic_contacts": 2508,
+      "type": "DNp03"
+    },
+    {
+      "synaptic_contacts": 14995,
+      "type": "DNp04"
+    },
+    {
+      "synaptic_contacts": 2871,
+      "type": "DNp06"
+    },
+    {
+      "synaptic_contacts": 3737,
+      "type": "DNp11"
+    }
+  ]
+}

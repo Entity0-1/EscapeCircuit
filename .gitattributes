@@ -1,0 +1,1 @@
+assets/models/apartment/modern_apartment/scene.bin filter=lfs diff=lfs merge=lfs -text

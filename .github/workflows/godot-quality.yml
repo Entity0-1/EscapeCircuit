@@ -1,0 +1,28 @@
+name: Godot quality
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot 4.7.2
+        run: |
+          curl --fail --location --output godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.7.2-stable_linux.x86_64
+      - name: Import project
+        run: ./Godot_v4.7.2-stable_linux.x86_64 --headless --editor --path . --quit
+      - name: Test neural controllers
+        run: ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_runner.gd
+      - name: Test gameplay integration
+        run: ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/gameplay_test_runner.gd

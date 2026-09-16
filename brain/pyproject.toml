@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "escape-circuit-brain"
+version = "0.1.0"
+description = "Local neural service and MaleCNS data pipeline for Escape Circuit"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+license = { text = "MIT" }
+authors = [{ name = "Escape Circuit contributors" }]
+dependencies = [
+  "numpy>=2.2,<3",
+  "pyarrow>=21,<23",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.17,<2",
+  "pytest>=8.4,<10",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+escape-circuit-brain = "escape_circuit_brain.server:main"
+escape-circuit-data = "escape_circuit_brain.download:main"
+escape-circuit-extract = "escape_circuit_brain.circuit:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/escape_circuit_brain"]
+
+[tool.pytest.ini_options]
+addopts = "-q --basetemp=.test-tmp"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["escape_circuit_brain"]
+
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*"]
+ignore_missing_imports = true

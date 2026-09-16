@@ -1,0 +1,260 @@
+class_name SwatterController
+extends Node3D
+
+signal impact(position: Vector3, intensity: float)
+signal swing_started(intensity: float)
+
+enum Phase { READY, WINDUP, STRIKE, IMPACT, RECOVER }
+
+const READY_OFFSET := 0.86
+const WINDUP_OFFSET := 1.46
+# World-space strike area. It is intentionally smaller than the forgiving
+# prototype so the player must lead and center a fast, realistically tiny fly.
+const PADDLE_HALF_SIZE := Vector2(0.36, 0.28)
+const SWEEP_VERTICAL_PADDING := 0.16
+const VIEW_SCALE := 0.19
+const VIEW_READY_OFFSET := Vector3(0.27, -0.11, -1.18)
+const VIEW_WINDUP_OFFSET := Vector3(0.34, -0.06, -1.02)
+const VIEW_STRIKE_OFFSET := Vector3(0.02, 0.02, -0.96)
+# These camera-side poses only rotate the visual model; the world-space strike
+# surface and its sweep remain fixed by the SwatterController node above.
+const VIEW_READY_ROTATION := Vector3(PI / 2.0 - 0.10, -0.10, 0.34)
+const VIEW_WINDUP_ROTATION := Vector3(PI / 2.0 - 0.24, -0.20, 0.12)
+const VIEW_STRIKE_ROTATION := Vector3(PI / 2.0 + 0.12, 0.04, -0.06)
+
+var phase := Phase.READY
+var phase_time := 0.0
+var charge := 0.0
+var aim_position := Vector3(0.0, 2.2, 0.0)
+var strike_position := Vector3.ZERO
+var strike_origin_height := 3.0
+var vertical_speed := 0.0
+var previous_height := 3.0
+var model_root: Node3D
+var paddle_root: Node3D
+var view_camera: Camera3D
+
+
+func _ready() -> void:
+	_build_model()
+	global_position = aim_position + Vector3.UP * READY_OFFSET
+	strike_position = aim_position
+
+
+func set_aim(world_point: Vector3) -> void:
+	aim_position = world_point
+
+
+func bind_view_camera(value: Camera3D) -> void:
+	view_camera = value
+	if model_root and is_instance_valid(view_camera):
+		model_root.global_transform = _get_view_transform()
+
+
+func begin_windup() -> void:
+	if phase != Phase.READY:
+		return
+	phase = Phase.WINDUP
+	phase_time = 0.0
+	charge = 0.0
+
+
+func release_swing() -> void:
+	if phase != Phase.WINDUP:
+		return
+	phase = Phase.STRIKE
+	phase_time = 0.0
+	charge = maxf(charge, 0.18)
+	strike_position = aim_position
+	strike_origin_height = global_position.y
+	emit_signal("swing_started", lerpf(0.55, 1.0, charge))
+
+
+func reset_swatter() -> void:
+	phase = Phase.READY
+	phase_time = 0.0
+	charge = 0.0
+	vertical_speed = 0.0
+	global_position = aim_position + Vector3.UP * READY_OFFSET
+	strike_position = aim_position
+	strike_origin_height = global_position.y
+	if model_root and is_instance_valid(view_camera):
+		model_root.global_transform = _get_view_transform()
+
+
+func is_dangerous() -> bool:
+	return phase == Phase.STRIKE and vertical_speed < -2.0
+
+
+func is_winding_up() -> bool:
+	return phase == Phase.WINDUP
+
+
+func get_charge() -> float:
+	return charge
+
+
+func get_downward_speed() -> float:
+	return maxf(0.0, -vertical_speed)
+
+
+func contains_world_point(point: Vector3) -> bool:
+	var local_point := to_local(point)
+	var swept_min_y := minf(global_position.y, previous_height) - SWEEP_VERTICAL_PADDING
+	var swept_max_y := maxf(global_position.y, previous_height) + SWEEP_VERTICAL_PADDING
+	return (
+		absf(local_point.x) <= PADDLE_HALF_SIZE.x
+		and absf(local_point.z) <= PADDLE_HALF_SIZE.y
+		and point.y >= swept_min_y
+		and point.y <= swept_max_y
+	)
+
+
+func spatial_distance_to(point: Vector3) -> float:
+	return global_position.distance_to(point)
+
+
+func _process(delta: float) -> void:
+	phase_time += delta
+	var follow_alpha := 1.0 - exp(-15.0 * delta)
+	var follow_position := strike_position if phase in [Phase.STRIKE, Phase.IMPACT] else aim_position
+	global_position.x = lerpf(global_position.x, follow_position.x, follow_alpha)
+	global_position.z = lerpf(global_position.z, follow_position.z, follow_alpha)
+	previous_height = global_position.y
+
+	match phase:
+		Phase.READY:
+			var ready_height := aim_position.y + READY_OFFSET
+			global_position.y = lerpf(global_position.y, ready_height, 1.0 - exp(-10.0 * delta))
+		Phase.WINDUP:
+			charge = clampf(charge + delta * 1.35, 0.0, 1.0)
+			var target_height := aim_position.y + WINDUP_OFFSET + charge * 0.34
+			global_position.y = lerpf(global_position.y, target_height, 1.0 - exp(-9.0 * delta))
+		Phase.STRIKE:
+			var strike_duration := lerpf(0.18, 0.095, charge)
+			var progress := clampf(phase_time / strike_duration, 0.0, 1.0)
+			var eased := 1.0 - pow(1.0 - progress, 3.0)
+			global_position.y = lerpf(strike_origin_height, strike_position.y, eased)
+			if progress >= 1.0:
+				phase = Phase.IMPACT
+				phase_time = 0.0
+				emit_signal("impact", global_position, lerpf(0.55, 1.0, charge))
+		Phase.IMPACT:
+			global_position.y = strike_position.y
+			if phase_time > 0.075:
+				phase = Phase.RECOVER
+				phase_time = 0.0
+		Phase.RECOVER:
+			var recover_progress := clampf(phase_time / 0.42, 0.0, 1.0)
+			var eased_recover := 1.0 - pow(1.0 - recover_progress, 2.0)
+			global_position.y = lerpf(strike_position.y, aim_position.y + READY_OFFSET, eased_recover)
+			if recover_progress >= 1.0:
+				phase = Phase.READY
+				phase_time = 0.0
+				charge = 0.0
+
+	vertical_speed = (global_position.y - previous_height) / maxf(delta, 0.0001)
+	_update_view_model(delta)
+
+
+func _build_model() -> void:
+	model_root = Node3D.new()
+	model_root.name = "Model"
+	model_root.top_level = true
+	add_child(model_root)
+
+	paddle_root = Node3D.new()
+	paddle_root.name = "Paddle"
+	model_root.add_child(paddle_root)
+
+	var frame_material := _material(Color("e1683c"), 0.42, 0.12)
+	var grip_material := _material(Color("242b32"), 0.72, 0.02)
+	var mesh_material := _material(Color(0.93, 0.36, 0.21, 0.78), 0.38, 0.08, true)
+
+	_add_box(paddle_root, Vector3(1.58, 0.075, 0.075), Vector3(0.0, 0.0, -0.64), frame_material)
+	_add_box(paddle_root, Vector3(1.58, 0.075, 0.075), Vector3(0.0, 0.0, 0.64), frame_material)
+	_add_box(paddle_root, Vector3(0.075, 0.075, 1.28), Vector3(-0.79, 0.0, 0.0), frame_material)
+	_add_box(paddle_root, Vector3(0.075, 0.075, 1.28), Vector3(0.79, 0.0, 0.0), frame_material)
+
+	for x_index in range(-5, 6):
+		_add_box(paddle_root, Vector3(0.018, 0.025, 1.18), Vector3(x_index * 0.13, 0.0, 0.0), mesh_material)
+	for z_index in range(-4, 5):
+		_add_box(paddle_root, Vector3(1.48, 0.025, 0.018), Vector3(0.0, 0.0, z_index * 0.13), mesh_material)
+
+	var handle_joint := Vector3(0.34, -0.58, 1.06)
+	_add_handle_segment(model_root, Vector3(0.0, -0.02, 0.58), handle_joint, 0.065, frame_material)
+	_add_handle_segment(model_root, handle_joint, Vector3(0.62, -0.96, 1.48), 0.095, grip_material)
+
+
+func _update_view_model(delta: float) -> void:
+	if not is_instance_valid(view_camera):
+		return
+	var target := _get_view_transform()
+	var follow_alpha := 1.0 - exp(-18.0 * delta)
+	model_root.global_transform = model_root.global_transform.interpolate_with(target, follow_alpha)
+
+
+func _get_view_transform() -> Transform3D:
+	var offset := VIEW_READY_OFFSET
+	var rotation_value := VIEW_READY_ROTATION
+	match phase:
+		Phase.WINDUP:
+			var pose_amount := smoothstep(0.0, 1.0, charge)
+			offset = VIEW_READY_OFFSET.lerp(VIEW_WINDUP_OFFSET, pose_amount)
+			rotation_value = VIEW_READY_ROTATION.lerp(VIEW_WINDUP_ROTATION, pose_amount)
+		Phase.STRIKE:
+			var duration := lerpf(0.18, 0.095, charge)
+			var progress := clampf(phase_time / duration, 0.0, 1.0)
+			var pose_amount := 1.0 - pow(1.0 - progress, 3.0)
+			offset = VIEW_WINDUP_OFFSET.lerp(VIEW_STRIKE_OFFSET, pose_amount)
+			rotation_value = VIEW_WINDUP_ROTATION.lerp(VIEW_STRIKE_ROTATION, pose_amount)
+		Phase.IMPACT:
+			offset = VIEW_STRIKE_OFFSET
+			rotation_value = VIEW_STRIKE_ROTATION
+		Phase.RECOVER:
+			var progress := clampf(phase_time / 0.42, 0.0, 1.0)
+			var pose_amount := 1.0 - pow(1.0 - progress, 2.0)
+			offset = VIEW_STRIKE_OFFSET.lerp(VIEW_READY_OFFSET, pose_amount)
+			rotation_value = VIEW_STRIKE_ROTATION.lerp(VIEW_READY_ROTATION, pose_amount)
+	var local_basis := Basis.from_euler(rotation_value).scaled(Vector3.ONE * VIEW_SCALE)
+	return view_camera.global_transform * Transform3D(local_basis, offset)
+
+
+func _add_box(parent: Node3D, size: Vector3, position_value: Vector3, material: Material) -> MeshInstance3D:
+	var instance := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	instance.mesh = mesh
+	instance.position = position_value
+	instance.material_override = material
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	parent.add_child(instance)
+	return instance
+
+
+func _add_handle_segment(parent: Node3D, from: Vector3, to: Vector3, radius: float, material: Material) -> MeshInstance3D:
+	var segment := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = from.distance_to(to)
+	mesh.radial_segments = 10
+	segment.mesh = mesh
+	segment.position = (from + to) * 0.5
+	segment.material_override = material
+	segment.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	segment.look_at_from_position(segment.position, to, Vector3.FORWARD)
+	segment.rotate_object_local(Vector3.RIGHT, PI / 2.0)
+	parent.add_child(segment)
+	return segment
+
+
+func _material(color: Color, roughness: float, metallic: float, transparent := false) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = roughness
+	material.metallic = metallic
+	if transparent:
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
