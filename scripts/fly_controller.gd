@@ -15,23 +15,33 @@ const TAKEOFF_DURATION := 0.24
 const NEURAL_STEERING_RATE := 15.0
 const VERTICAL_CRUISE_MULTIPLIER := 1.55
 const VERTICAL_DODGE_MULTIPLIER := 1.42
+const CRUISE_ALTITUDE_MIN := 1.02
+const CRUISE_ALTITUDE_MAX := 2.22
+const CRUISE_ALTITUDE_STEP := Vector2(0.55, 0.82)
+const CRUISE_ALTITUDE_INTERVAL := Vector2(0.85, 1.35)
+const CRUISE_ALTITUDE_STEERING := 1.6
 const PERCH_REACTION_TIME := 0.040
 const PERCH_LOOM_THRESHOLD := 0.006
-const BODY_RADIUS := 0.052
+const BODY_RADIUS := 0.046
 const IMPORTED_FLY_PATH := "res://assets/models/fly_housefly_ccby/scene.gltf"
-const IMPORTED_FLY_SIZE := 0.18
+const IMPORTED_FLY_SIZE := 0.16
 const VOLUME_MIN := ApartmentLayout.FLY_MIN
 const VOLUME_MAX := ApartmentLayout.FLY_MAX
 const PERCH_POINTS := ApartmentLayout.PERCH_POINTS
+const FLIGHT_TURN_BRAIN := preload("res://scripts/brain/flight_turn_brain.gd")
 
 var state := State.FLYING
 var connectome_brain := ConnectomeBrain.new()
 var fallback_brain := FallbackBrain.new()
+var turn_brain := FLIGHT_TURN_BRAIN.new()
 var brain_output: Dictionary = {}
+var turn_output: Dictionary = {}
 var sensed_threat: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var desired_direction := Vector3.FORWARD
 var wander_target := Vector3.ZERO
+var cruise_altitude_target := 1.78
+var cruise_altitude_timer := 0.45
 var state_time := 0.0
 var decision_time := 0.0
 var dodge_cooldown := 0.0
@@ -40,6 +50,10 @@ var perceived_loom := 0.0
 var perceived_proximity := 0.0
 var perch_alert_time := 0.0
 var takeoff_threatened := false
+var selected_action := "NONE"
+var turn_pulse_timer := 0.9
+var turn_pulse_remaining := 0.0
+var turn_pulse_side := 0.0
 var wing_phase := 0.0
 var body_root: Node3D
 var imported_model: Node3D
@@ -67,6 +81,8 @@ func reset_fly(seed_value: int) -> void:
 	rng.seed = seed_value
 	connectome_brain.reset()
 	fallback_brain.reset()
+	turn_brain.reset()
+	turn_output.clear()
 	sensed_threat.clear()
 	state = State.FLYING
 	state_time = 0.0
@@ -77,12 +93,18 @@ func reset_fly(seed_value: int) -> void:
 	perceived_proximity = 0.0
 	perch_alert_time = 0.0
 	takeoff_threatened = false
+	selected_action = "NONE"
+	turn_pulse_timer = rng.randf_range(0.75, 1.25)
+	turn_pulse_remaining = 0.0
+	turn_pulse_side = 0.0
 	wing_phase = 0.0
 	global_position = ApartmentLayout.FLY_START
 	rotation = Vector3.ZERO
 	velocity = Vector3.ZERO
 	visible = true
 	wander_target = _random_air_point()
+	cruise_altitude_target = global_position.y
+	cruise_altitude_timer = 0.45
 
 
 func set_sensors(delta: float, sensors: Dictionary, external_output: Dictionary = {}) -> void:
@@ -121,7 +143,10 @@ func is_hit() -> bool:
 
 
 func get_activity() -> Dictionary:
-	return brain_output.get("activity", {})
+	var values: Dictionary = brain_output.get("activity", {}).duplicate()
+	values["turn_saccade"] = float(turn_output.get("saccade_drive", 0.0))
+	values["turn_straight"] = float(turn_output.get("straight_drive", 0.0))
+	return values
 
 
 func get_sensed_threat() -> Dictionary:
@@ -129,7 +154,10 @@ func get_sensed_threat() -> Dictionary:
 
 
 func get_circuit_response() -> Dictionary:
-	return brain_output
+	var response := brain_output.duplicate(true)
+	response["selected_action"] = selected_action
+	response["flight_turn"] = turn_output.duplicate(true)
+	return response
 
 
 func get_brain_mode() -> String:
@@ -177,9 +205,12 @@ func _update_perched(delta: float) -> void:
 	var neural_alarm := (
 		bool(brain_output.get("trigger_escape", false))
 		or float(brain_output.get("escape_drive", 0.0)) > 0.34
-		or float(brain_output.get("takeoff_drive", 0.0)) > 0.46
+		or float(brain_output.get("takeoff_drive", 0.0)) > 0.24
 	)
-	if dodge_cooldown <= 0.0 and (neural_alarm or perch_alert_time >= PERCH_REACTION_TIME):
+	# The measured-contact path decides takeoff latency. The old fixed-delay
+	# reaction remains only for the prototype when no circuit is available.
+	var prototype_alarm := not connectome_brain.is_loaded() and perch_alert_time >= PERCH_REACTION_TIME
+	if dodge_cooldown <= 0.0 and (neural_alarm or prototype_alarm):
 		_begin_perch_takeoff(true)
 		return
 	velocity = velocity.lerp(Vector3.ZERO, 1.0 - exp(-10.0 * delta))
@@ -191,10 +222,15 @@ func _begin_perch_takeoff(threatened: bool) -> void:
 	state = State.TAKEOFF
 	state_time = 0.0
 	takeoff_threatened = threatened
+	selected_action = _select_takeoff_action() if threatened else "NATURAL_TAKEOFF"
 	perch_alert_time = 0.0
 	dodge_cooldown = 0.72 if threatened else 0.35
 
 	var launch_direction := _neural_motor_direction(desired_direction) if threatened else Vector3.ZERO
+	if selected_action == "BACKWARD_TAKEOFF":
+		launch_direction = global_basis.z
+	elif selected_action == "FORWARD_TAKEOFF":
+		launch_direction = -global_basis.z
 	launch_direction.y = 0.0
 	if launch_direction.length_squared() < 0.01:
 		launch_direction = Vector3(
@@ -204,13 +240,15 @@ func _begin_perch_takeoff(threatened: bool) -> void:
 		)
 	launch_direction = launch_direction.normalized()
 	var lateral := Vector3(-launch_direction.z, 0.0, launch_direction.x)
-	var upward_drive := 0.72 if threatened else 0.52
+	var directional_takeoff := selected_action in ["BACKWARD_TAKEOFF", "FORWARD_TAKEOFF"]
+	var upward_drive := 0.61 if directional_takeoff else (0.72 if threatened else 0.52)
+	var lateral_offset := _motor_value("yaw_drive", 0.0) * 0.35 if directional_takeoff else rng.randf_range(-0.22, 0.22)
 	desired_direction = (
 		launch_direction * 0.78
-		+ lateral * rng.randf_range(-0.22, 0.22)
+		+ lateral * lateral_offset
 		+ Vector3.UP * upward_drive
 	).normalized()
-	var launch_speed := THREAT_TAKEOFF_SPEED if threatened else NATURAL_TAKEOFF_SPEED
+	var launch_speed := (9.2 if directional_takeoff else THREAT_TAKEOFF_SPEED) if threatened else NATURAL_TAKEOFF_SPEED
 	velocity = desired_direction * launch_speed
 	wander_target = _random_air_point()
 	decision_time = _destination_decision_time()
@@ -218,12 +256,25 @@ func _begin_perch_takeoff(threatened: bool) -> void:
 		emit_signal("escaped")
 
 
+func _select_takeoff_action() -> String:
+	if not brain_output.has("fast_takeoff_drive"):
+		return "FAST_TAKEOFF"
+	var fast := _motor_value("fast_takeoff_drive", 0.0)
+	var backward := _motor_value("backward_takeoff_drive", 0.0)
+	var forward := _motor_value("forward_takeoff_drive", 0.0)
+	if fast * 1.10 >= maxf(backward, forward):
+		return "FAST_TAKEOFF"
+	return "BACKWARD_TAKEOFF" if backward >= forward * 0.90 else "FORWARD_TAKEOFF"
+
+
 func _update_takeoff(delta: float) -> void:
-	var progress := clampf(state_time / TAKEOFF_DURATION, 0.0, 1.0)
-	var initial_speed := THREAT_TAKEOFF_SPEED if takeoff_threatened else NATURAL_TAKEOFF_SPEED
-	var target_speed := DODGE_SPEED if takeoff_threatened else CRUISE_SPEED
+	var directional_takeoff := selected_action in ["BACKWARD_TAKEOFF", "FORWARD_TAKEOFF"]
+	var duration := 0.32 if directional_takeoff else TAKEOFF_DURATION
+	var progress := clampf(state_time / duration, 0.0, 1.0)
+	var initial_speed := (9.2 if directional_takeoff else THREAT_TAKEOFF_SPEED) if takeoff_threatened else NATURAL_TAKEOFF_SPEED
+	var target_speed := (DODGE_SPEED * 0.82 if directional_takeoff else DODGE_SPEED) if takeoff_threatened else CRUISE_SPEED
 	var burst_speed := lerpf(initial_speed, target_speed, progress * progress)
-	if takeoff_threatened:
+	if takeoff_threatened and not directional_takeoff:
 		var neural_direction := _neural_motor_direction(desired_direction)
 		desired_direction = desired_direction.lerp(
 			neural_direction,
@@ -233,13 +284,18 @@ func _update_takeoff(delta: float) -> void:
 	var previous_position := global_position
 	_move_inside_apartment(delta)
 	_face_velocity(delta, global_position - previous_position)
-	if state_time >= TAKEOFF_DURATION:
+	if state_time >= duration:
 		state = State.DODGING if takeoff_threatened else State.FLYING
 		state_time = 0.0
+		if not takeoff_threatened:
+			selected_action = "NONE"
 
 
 func _update_flight_behavior(delta: float) -> void:
-	if bool(brain_output.get("trigger_escape", false)) and dodge_cooldown <= 0.0:
+	if (
+		bool(brain_output.get("trigger_escape", false))
+		or _motor_value("flight_saccade_drive", 0.0) > 0.32
+	) and dodge_cooldown <= 0.0:
 		_begin_dodge()
 		return
 
@@ -267,11 +323,30 @@ func _update_flight_behavior(delta: float) -> void:
 		apartment_layout.route_point(global_position, wander_target)
 		if apartment_layout != null else wander_target
 	)
+	# Game-only cruise variation. It does not change the connectome output or
+	# intervene in the TAKEOFF, DODGING, or RECOVERING escape states.
+	if not _is_perch_point(wander_target):
+		_update_cruise_altitude(delta)
+		var changing_rooms := apartment_layout != null and apartment_layout.room_at(global_position) != apartment_layout.room_at(wander_target)
+		if changing_rooms or absf(navigation_target.y - global_position.y) < 0.35:
+			navigation_target.y = clampf(cruise_altitude_target, 1.15, 1.95) if changing_rooms else cruise_altitude_target
 	var navigation_direction := navigation_target - global_position
+	navigation_direction.y *= CRUISE_ALTITUDE_STEERING
 	if navigation_direction.length_squared() > 0.01:
 		navigation_direction = navigation_direction.normalized()
 	else:
 		navigation_direction = desired_direction
+	_update_spontaneous_turn(delta, wander_target)
+	var spontaneous_turn := float(turn_output.get("turn_drive", 0.0))
+	if absf(spontaneous_turn) > 0.14:
+		var horizontal_heading := Vector3(navigation_direction.x, 0.0, navigation_direction.z)
+		if horizontal_heading.length_squared() > 0.01:
+			var rightward := Vector3(-horizontal_heading.z, 0.0, horizontal_heading.x).normalized()
+			var turn_weight := clampf(absf(spontaneous_turn) * 1.20, 0.0, 0.90)
+			navigation_direction = (
+				navigation_direction * (1.0 - turn_weight)
+				+ rightward * signf(spontaneous_turn) * turn_weight
+			).normalized()
 	var neural_direction := _neural_motor_direction(navigation_direction)
 	var neural_weight := clampf(
 		maxf(
@@ -289,35 +364,86 @@ func _update_flight_behavior(delta: float) -> void:
 	var cruise_scale := lerpf(0.88, 1.13, _motor_value("flight_power", 0.48))
 	var target_velocity := desired_direction * CRUISE_SPEED * cruise_scale
 	target_velocity.y *= VERTICAL_CRUISE_MULTIPLIER
-	velocity = velocity.lerp(target_velocity + bob, 1.0 - exp(-4.8 * delta))
+	var steering_rate := 12.0 if absf(spontaneous_turn) > 0.22 else 4.8
+	velocity = velocity.lerp(target_velocity + bob, 1.0 - exp(-steering_rate * delta))
 	var previous_position := global_position
 	_move_inside_apartment(delta)
 	_face_velocity(delta, global_position - previous_position)
+
+
+func _update_spontaneous_turn(delta: float, target: Vector3) -> void:
+	if not turn_brain.is_loaded():
+		turn_output = {}
+		return
+	var changing_rooms := apartment_layout != null and apartment_layout.room_at(global_position) != apartment_layout.room_at(target)
+	var straight_input := 0.95 if changing_rooms else (0.12 if global_position.distance_to(target) < 2.5 else 0.28)
+	turn_pulse_timer -= delta
+	turn_pulse_remaining = maxf(0.0, turn_pulse_remaining - delta)
+	if turn_pulse_timer <= 0.0:
+		turn_pulse_timer = rng.randf_range(0.95, 1.55)
+		if not changing_rooms:
+			turn_pulse_remaining = 0.19
+			turn_pulse_side = -1.0 if rng.randf() < 0.5 else 1.0
+	turn_output = turn_brain.step(delta, {
+		"left_pulse": 1.0 if turn_pulse_remaining > 0.0 and turn_pulse_side < 0.0 else 0.0,
+		"right_pulse": 1.0 if turn_pulse_remaining > 0.0 and turn_pulse_side > 0.0 else 0.0,
+		"straight": straight_input,
+	})
+
+
+func _update_cruise_altitude(delta: float) -> void:
+	cruise_altitude_timer -= delta
+	if cruise_altitude_timer > 0.0:
+		return
+	var climb := rng.randf() < 0.5
+	if global_position.y < 1.42:
+		climb = true
+	elif global_position.y > 1.82:
+		climb = false
+	var step := rng.randf_range(CRUISE_ALTITUDE_STEP.x, CRUISE_ALTITUDE_STEP.y)
+	cruise_altitude_target = clampf(
+		global_position.y + (step if climb else -step),
+		CRUISE_ALTITUDE_MIN,
+		CRUISE_ALTITUDE_MAX
+	)
+	cruise_altitude_timer = rng.randf_range(CRUISE_ALTITUDE_INTERVAL.x, CRUISE_ALTITUDE_INTERVAL.y)
 
 
 func _begin_dodge() -> void:
 	state = State.DODGING
 	state_time = 0.0
 	dodge_cooldown = 0.78
+	selected_action = "FLIGHT_SACCADE" if _motor_value("flight_saccade_drive", 0.0) > 0.24 else "EVASIVE_FLIGHT"
 	var fallback_direction := velocity.normalized() if velocity.length_squared() > 0.01 else desired_direction
-	desired_direction = _neural_motor_direction(fallback_direction)
+	if selected_action == "FLIGHT_SACCADE":
+		var side := _motor_value("saccade_side", 0.0)
+		if absf(side) < 0.02:
+			side = -1.0 if rng.randf() < 0.5 else 1.0
+		var horizontal := Vector3(fallback_direction.x, 0.0, fallback_direction.z).normalized()
+		if horizontal.length_squared() < 0.01:
+			horizontal = -global_basis.z
+		var lateral := Vector3(-horizontal.z, 0.0, horizontal.x) * signf(side)
+		desired_direction = (horizontal * 0.28 + lateral * 0.86 + Vector3.UP * 0.20).normalized()
+	else:
+		desired_direction = _neural_motor_direction(fallback_direction)
 	emit_signal("escaped")
 
 
 func _update_dodge(delta: float) -> void:
 	var neural_direction := _neural_motor_direction(desired_direction)
+	var sharp_saccade := selected_action == "FLIGHT_SACCADE"
 	desired_direction = desired_direction.lerp(
 		neural_direction,
-		1.0 - exp(-NEURAL_STEERING_RATE * delta)
+		1.0 - exp(-NEURAL_STEERING_RATE * (0.42 if sharp_saccade else 1.0) * delta)
 	).normalized()
-	var speed_curve := clampf(1.25 - state_time * 0.55, 0.62, 1.0)
+	var speed_curve := clampf((1.06 if sharp_saccade else 1.25) - state_time * 0.55, 0.62, 1.0)
 	var power_scale := lerpf(0.90, 1.12, _motor_value("flight_power", 0.5))
 	velocity = desired_direction * DODGE_SPEED * speed_curve * power_scale
 	velocity.y *= VERTICAL_DODGE_MULTIPLIER
 	var previous_position := global_position
 	_move_inside_apartment(delta)
 	_face_velocity(delta, global_position - previous_position)
-	if state_time >= 0.64:
+	if state_time >= (0.43 if sharp_saccade else 0.64):
 		state = State.RECOVERING
 		state_time = 0.0
 		wander_target = _choose_destination()
@@ -342,6 +468,7 @@ func _update_recovery(delta: float) -> void:
 	if state_time > 0.42:
 		state = State.FLYING
 		state_time = 0.0
+		selected_action = "NONE"
 		decision_time = _destination_decision_time()
 		emit_signal("recovered")
 
@@ -551,7 +678,7 @@ func _build_model() -> void:
 	shadow = MeshInstance3D.new()
 	shadow.name = "Shadow"
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.18, 0.13)
+	quad.size = Vector2(0.16, 0.115)
 	shadow.mesh = quad
 	var shadow_material := StandardMaterial3D.new()
 	shadow_material.albedo_color = Color(0.0, 0.0, 0.0, 0.28)

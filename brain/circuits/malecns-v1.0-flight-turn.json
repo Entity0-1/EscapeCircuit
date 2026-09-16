@@ -1,0 +1,169 @@
+{
+  "dataset": {
+    "annotations_sha256": "2177e246113e4cfbf1e7772ec37c6da1955ff22e8063d0b1f833101f99a9a3b2",
+    "edges_sha256": "e35da783d1c686b2b58b3b87cd6a403ae43bfcfba8bff28e08ef752c1a56afc1",
+    "id": "malecns-v1.0",
+    "license": "CC-BY-4.0",
+    "release": "v1.0",
+    "source_page": "https://male-cns.janelia.org/download/"
+  },
+  "model_boundary": {
+    "claim": "Connectome-weighted turn regulation, not a biological flight simulation.",
+    "engineered": "Game-state inputs, tonic activity, inhibitory signs, rate dynamics, thresholds, and flight movement.",
+    "observed": "Annotated neuron identities and direct synaptic contact counts."
+  },
+  "name": "MaleCNS v1.0 spontaneous-flight-turn motif",
+  "observed_aggregates": [
+    {
+      "connection_rows": 1,
+      "source_side": "L",
+      "source_type": "DNa15",
+      "synaptic_contacts": 1,
+      "target_side": "R",
+      "target_type": "DNb01"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "R",
+      "source_type": "DNa15",
+      "synaptic_contacts": 6,
+      "target_side": "L",
+      "target_type": "DNb01"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "L",
+      "source_type": "DNb01",
+      "synaptic_contacts": 18,
+      "target_side": "R",
+      "target_type": "DNa15"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "R",
+      "source_type": "DNb01",
+      "synaptic_contacts": 28,
+      "target_side": "L",
+      "target_type": "DNa15"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "L",
+      "source_type": "VES041",
+      "synaptic_contacts": 6,
+      "target_side": "L",
+      "target_type": "DNa15"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "L",
+      "source_type": "VES041",
+      "synaptic_contacts": 4,
+      "target_side": "R",
+      "target_type": "DNa15"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "L",
+      "source_type": "VES041",
+      "synaptic_contacts": 22,
+      "target_side": "L",
+      "target_type": "DNb01"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "L",
+      "source_type": "VES041",
+      "synaptic_contacts": 17,
+      "target_side": "R",
+      "target_type": "DNb01"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "L",
+      "source_type": "VES041",
+      "synaptic_contacts": 2,
+      "target_side": "R",
+      "target_type": "VES041"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "R",
+      "source_type": "VES041",
+      "synaptic_contacts": 8,
+      "target_side": "R",
+      "target_type": "DNa15"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "R",
+      "source_type": "VES041",
+      "synaptic_contacts": 5,
+      "target_side": "L",
+      "target_type": "DNb01"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "R",
+      "source_type": "VES041",
+      "synaptic_contacts": 6,
+      "target_side": "R",
+      "target_type": "DNb01"
+    },
+    {
+      "connection_rows": 1,
+      "source_side": "R",
+      "source_type": "VES041",
+      "synaptic_contacts": 15,
+      "target_side": "L",
+      "target_type": "VES041"
+    }
+  ],
+  "references": [
+    "https://male-cns.janelia.org/download/",
+    "https://pubmed.ncbi.nlm.nih.gov/38228148/"
+  ],
+  "report_sha256": "4d1202e9cb3d196ec1b043f8405a499513018839126e4cef009c2f22d0bf710d",
+  "schema_version": 1,
+  "selection": {
+    "node_ids": [
+      {
+        "body_id": 10109,
+        "side": "L",
+        "type": "VES041"
+      },
+      {
+        "body_id": 10167,
+        "side": "R",
+        "type": "VES041"
+      },
+      {
+        "body_id": 10654,
+        "side": "L",
+        "type": "DNb01"
+      },
+      {
+        "body_id": 10759,
+        "side": "R",
+        "type": "DNb01"
+      },
+      {
+        "body_id": 10837,
+        "side": "R",
+        "type": "DNa15"
+      },
+      {
+        "body_id": 10884,
+        "side": "L",
+        "type": "DNa15"
+      }
+    ],
+    "node_types": [
+      "VES041",
+      "DNa15",
+      "DNb01"
+    ],
+    "observed_connection_rows": 13,
+    "observed_synaptic_contacts": 138
+  }
+}

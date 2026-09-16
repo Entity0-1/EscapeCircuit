@@ -110,11 +110,23 @@ class ConnectomeCircuitController:
 
     def step(self, dt_seconds: float, sensors: Sensors) -> tuple[BrainOutput, dict[str, float]]:
         alpha = 1.0 - math.exp(-self.response_rate * dt_seconds)
+        lc4_left = sensors.lc4_left if sensors.lc4_left is not None else sensors.loom_left
+        lc4_right = sensors.lc4_right if sensors.lc4_right is not None else sensors.loom_right
+        lplc2_left = (
+            sensors.lplc2_left
+            if sensors.lplc2_left is not None
+            else sensors.loom_left * (0.72 + sensors.proximity * 0.28)
+        )
+        lplc2_right = (
+            sensors.lplc2_right
+            if sensors.lplc2_right is not None
+            else sensors.loom_right * (0.72 + sensors.proximity * 0.28)
+        )
         source_activity = {
-            "LC4:L": sensors.loom_left,
-            "LC4:R": sensors.loom_right,
-            "LPLC2:L": sensors.loom_left * (0.72 + sensors.proximity * 0.28),
-            "LPLC2:R": sensors.loom_right * (0.72 + sensors.proximity * 0.28),
+            "LC4:L": lc4_left,
+            "LC4:R": lc4_right,
+            "LPLC2:L": lplc2_left,
+            "LPLC2:R": lplc2_right,
         }
         for target_key, incoming in self.contacts.items():
             total_contacts = sum(incoming.values())
@@ -150,6 +162,17 @@ class ConnectomeCircuitController:
             for target in ("DNp03", "DNp06")
         )
         evasive = max(left_collision, right_collision)
+        backward_takeoff = max(
+            (self.target_activity.get(("DNp02", side), 0.0)
+             + self.target_activity.get(("DNp04", side), 0.0)) * 0.5
+            for side in ("L", "R")
+        )
+        forward_takeoff = max(
+            self.target_activity.get(("DNp11", side), 0.0) for side in ("L", "R")
+        )
+        left_saccade = self.target_activity.get(("DNp03", "L"), 0.0)
+        right_saccade = self.target_activity.get(("DNp03", "R"), 0.0)
+        flight_saccade = max(left_saccade, right_saccade)
         fast = max(left_fast, right_fast)
         directional = max(left_directional, right_directional)
         target_escape = min(
@@ -203,11 +226,21 @@ class ConnectomeCircuitController:
             roll_drive=roll_drive,
             flight_power=flight_power,
             landing_drive=landing_drive,
+            fast_takeoff_drive=fast,
+            backward_takeoff_drive=backward_takeoff,
+            forward_takeoff_drive=forward_takeoff,
+            flight_saccade_drive=flight_saccade,
+            saccade_side=max(-1.0, min(1.0, left_saccade - right_saccade)),
         )
         return output, {
             "visual_left": max(sensors.loom_left, left_fast),
             "visual_right": max(sensors.loom_right, right_fast),
+            "lc4": max(lc4_left, lc4_right),
+            "lplc2": max(lplc2_left, lplc2_right),
             "dn_takeoff": fast,
+            "dn_backward": backward_takeoff,
+            "dn_forward": forward_takeoff,
+            "dn_saccade": flight_saccade,
             "escape": self.escape_drive,
             "motor": min(1.0, abs(self.motor_bias)),
         }

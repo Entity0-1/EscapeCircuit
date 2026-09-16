@@ -7,6 +7,7 @@ const REPLAY_BUFFER_SECONDS := 12.0
 const REPLAY_SAMPLE_INTERVAL := 1.0 / 24.0
 const AIM_MIN := Vector3(-6.22, 0.37, -1.18)
 const AIM_MAX := Vector3(14.00, 2.60, 4.10)
+const LOOMING_ENCODER := preload("res://scripts/brain/looming_encoder.gd")
 
 var game_state := GameState.MENU
 var time_left := ROUND_DURATION
@@ -252,15 +253,17 @@ func _update_fly_sensors(delta: float) -> void:
 	var swatter_offset := swatter.global_position - fly.global_position
 	var swatter_distance := swatter_offset.length()
 	var swatter_proximity := clampf(1.0 - swatter_distance / 5.2, 0.0, 1.0)
-	# A static or charging swatter is not a looming stimulus. Only a paddle
-	# descending toward the fly contributes visual expansion and threat proximity.
+	# The paddle contributes visual expansion only during a descending strike;
+	# moving it away during charge-up does not activate the escape pathway.
 	var strike_closing_speed := (
 		swatter.get_downward_speed()
 		if swatter.phase == SwatterController.Phase.STRIKE and swatter_offset.y > 0.0
 		else 0.0
 	)
-	var speed_factor := clampf((strike_closing_speed - 2.0) / 7.5, 0.0, 1.0)
-	var swatter_loom := clampf(swatter_proximity * speed_factor * 1.55, 0.0, 1.0)
+	var swatter_closing := strike_closing_speed * swatter_offset.y / maxf(swatter_distance, 0.05)
+	var swatter_features: Dictionary = LOOMING_ENCODER.encode(
+		SwatterController.PADDLE_HALF_SIZE.x, swatter_distance, swatter_closing
+	)
 	var swatter_local := fly.global_transform.basis.inverse() * swatter_offset
 	var swatter_side := clampf(swatter_local.x / maxf(swatter_distance, 0.01), -1.0, 1.0)
 	var swatter_vertical := clampf(swatter_local.y / maxf(swatter_distance, 0.01), -1.0, 1.0)
@@ -271,33 +274,42 @@ func _update_fly_sensors(delta: float) -> void:
 	var player_velocity := player.get_movement_velocity()
 	var player_motion := clampf(player_velocity.length() / PlayerController.MOVE_SPEED, 0.0, 1.0)
 	var direction_to_fly := -player_offset.normalized() if player_distance > 0.01 else Vector3.ZERO
-	var approach_factor := clampf(
-		player_velocity.dot(direction_to_fly) / PlayerController.MOVE_SPEED,
-		0.0,
-		1.0
-	)
-	var close_body_cue := 0.16 if player_distance < 1.5 else 0.0
-	var player_loom := clampf(
-		player_proximity * (close_body_cue + player_motion * 0.85 + approach_factor * 0.65),
-		0.0,
-		0.95
+	var player_closing := maxf(0.0, player_velocity.dot(direction_to_fly))
+	var player_features: Dictionary = LOOMING_ENCODER.encode(
+		0.44, player_distance, player_closing
 	)
 	var player_local := fly.global_transform.basis.inverse() * player_offset
 	var player_side := clampf(player_local.x / maxf(player_distance, 0.01), -1.0, 1.0)
 	var player_vertical := clampf(player_local.y / maxf(player_distance, 0.01), -1.0, 1.0)
 
-	var left_loom := clampf(
-		swatter_loom * clampf(0.5 - swatter_side * 0.5, 0.0, 1.0)
-		+ player_loom * clampf(0.5 - player_side * 0.5, 0.0, 1.0),
+	var swatter_left := clampf(0.5 - swatter_side * 0.5, 0.0, 1.0)
+	var swatter_right := 1.0 - swatter_left
+	var player_left := clampf(0.5 - player_side * 0.5, 0.0, 1.0)
+	var player_right := 1.0 - player_left
+	var lc4_left := clampf(
+		float(swatter_features.lc4) * swatter_left + float(player_features.lc4) * player_left,
 		0.0,
 		1.0
 	)
-	var right_loom := clampf(
-		swatter_loom * clampf(0.5 + swatter_side * 0.5, 0.0, 1.0)
-		+ player_loom * clampf(0.5 + player_side * 0.5, 0.0, 1.0),
+	var lc4_right := clampf(
+		float(swatter_features.lc4) * swatter_right + float(player_features.lc4) * player_right,
 		0.0,
 		1.0
 	)
+	var lplc2_left := clampf(
+		float(swatter_features.lplc2) * swatter_left + float(player_features.lplc2) * player_left,
+		0.0,
+		1.0
+	)
+	var lplc2_right := clampf(
+		float(swatter_features.lplc2) * swatter_right + float(player_features.lplc2) * player_right,
+		0.0,
+		1.0
+	)
+	var left_loom := maxf(lc4_left, lplc2_left)
+	var right_loom := maxf(lc4_right, lplc2_right)
+	var swatter_loom := maxf(float(swatter_features.lc4), float(swatter_features.lplc2))
+	var player_loom := maxf(float(player_features.lc4), float(player_features.lplc2))
 	var up_loom := clampf(
 		swatter_loom * clampf(0.5 + swatter_vertical * 0.5, 0.0, 1.0)
 		+ player_loom * clampf(0.5 + player_vertical * 0.5, 0.0, 1.0),
@@ -310,17 +322,17 @@ func _update_fly_sensors(delta: float) -> void:
 		0.0,
 		1.0
 	)
-	var active_swatter_proximity := swatter_proximity * speed_factor
-	var player_threat_proximity := player_proximity * clampf(
-		0.12 + player_motion * 0.45 + approach_factor * 0.35,
-		0.0,
-		0.92
-	)
+	var active_swatter_proximity := swatter_proximity * swatter_loom
+	var player_threat_proximity := player_proximity * player_loom * player_motion
 	var sensors := {
 		"loom_left": left_loom,
 		"loom_right": right_loom,
 		"loom_up": up_loom,
 		"loom_down": down_loom,
+		"lc4_left": lc4_left,
+		"lc4_right": lc4_right,
+		"lplc2_left": lplc2_left,
+		"lplc2_right": lplc2_right,
 		"proximity": maxf(active_swatter_proximity, player_threat_proximity),
 		"impact": impact_pulse,
 	}

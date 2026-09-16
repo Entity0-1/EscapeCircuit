@@ -22,7 +22,11 @@ func _run() -> void:
 	_test_smaller_swatter_hitbox(game)
 	_test_near_miss(game)
 	_test_fly_moves_in_three_dimensions(game)
+	_test_cruise_altitude_is_gameplay_only(game)
 	_test_neural_motor_channels_steer_fly(game)
+	_test_distinct_escape_actions(game)
+	_test_observed_escape_circuit_selects_takeoffs(game)
+	_test_flight_turn_motif_steers_cruising(game)
 	_test_player_approach_threatens_fly(game)
 	_test_vertical_escape_is_fast(game)
 	_test_imported_fly_model(game)
@@ -46,7 +50,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	if failures == 0:
-		print("PASS: 22 gameplay integration tests")
+		print("PASS: 26 gameplay integration tests")
 		quit(0)
 	else:
 		push_error("FAIL: %d gameplay test(s) failed" % failures)
@@ -113,6 +117,28 @@ func _test_fly_moves_in_three_dimensions(game) -> void:
 	_assert(absf(movement.z) > 0.20, "fly traverses apartment depth")
 
 
+func _test_cruise_altitude_is_gameplay_only(game) -> void:
+	game._start_round()
+	game.fly.global_position = Vector3(-0.50, 1.55, 2.90)
+	game.fly.velocity = Vector3.ZERO
+	game.fly.state = FlyController.State.FLYING
+	game.fly.decision_time = 5.0
+	game.fly.wander_target = Vector3(-5.30, 1.55, 3.00)
+	game.fly.cruise_altitude_timer = 0.0
+	game.fly.brain_output = {"escape_drive": 0.0, "yaw_drive": 0.0, "pitch_drive": 0.0}
+	var original_output: Dictionary = game.fly.brain_output.duplicate(true)
+	for _step in range(20):
+		game.fly._physics_process(1.0 / 60.0)
+	_assert(absf(game.fly.cruise_altitude_target - 1.55) > 0.45, "ordinary flight selects a meaningful height change")
+	_assert(absf(game.fly.global_position.y - 1.55) > 0.08, "ordinary flight moves vertically toward the new height")
+	_assert(game.fly.brain_output == original_output, "cruise altitude does not change the circuit output")
+	var cruise_target: float = game.fly.cruise_altitude_target
+	var cruise_timer: float = game.fly.cruise_altitude_timer
+	game.fly.state = FlyController.State.DODGING
+	game.fly._update_dodge(1.0 / 60.0)
+	_assert(is_equal_approx(game.fly.cruise_altitude_target, cruise_target) and is_equal_approx(game.fly.cruise_altitude_timer, cruise_timer), "neural dodge does not use cruise altitude changes")
+
+
 func _test_neural_motor_channels_steer_fly(game) -> void:
 	game._start_round()
 	game.fly.global_position = Vector3(-0.45, 1.70, 3.05)
@@ -134,6 +160,73 @@ func _test_neural_motor_channels_steer_fly(game) -> void:
 		game.fly._physics_process(1.0 / 60.0)
 	_assert(game.fly.global_position.x > start_position.x + 0.1, "connectome yaw command continuously changes the 3D trajectory")
 	_assert(game.fly.body_root.rotation.z < -0.1, "connectome roll command banks the fly during the turn")
+
+
+func _test_distinct_escape_actions(game) -> void:
+	for case in [
+		{"fast": 0.85, "back": 0.15, "forward": 0.15, "action": "FAST_TAKEOFF", "sign": 0},
+		{"fast": 0.15, "back": 0.75, "forward": 0.25, "action": "BACKWARD_TAKEOFF", "sign": 1},
+		{"fast": 0.15, "back": 0.25, "forward": 0.75, "action": "FORWARD_TAKEOFF", "sign": -1},
+	]:
+		game._start_round()
+		game.fly.state = FlyController.State.PERCHED
+		game.fly.global_position = FlyController.PERCH_POINTS[0]
+		game.fly.rotation = Vector3.ZERO
+		game.fly.brain_output = {
+			"fast_takeoff_drive": case.fast,
+			"backward_takeoff_drive": case.back,
+			"forward_takeoff_drive": case.forward,
+		}
+		game.fly._begin_perch_takeoff(true)
+		_assert(game.fly.selected_action == case.action, "descending-population ratios choose %s" % case.action)
+		if case.sign != 0:
+			_assert(signf(game.fly.velocity.z) == float(case.sign), "%s moves in its distinct body-relative direction" % case.action)
+	game._start_round()
+	game.fly.state = FlyController.State.FLYING
+	game.fly.velocity = Vector3.FORWARD * FlyController.CRUISE_SPEED
+	game.fly.brain_output = {"flight_saccade_drive": 0.85, "saccade_side": 1.0}
+	game.fly._update_flight_behavior(1.0 / 60.0)
+	_assert(game.fly.selected_action == "FLIGHT_SACCADE", "DNp03 activity selects an airborne saccade")
+	_assert(game.fly.desired_direction.x > 0.4, "airborne saccade turns sharply away from lateral threat")
+
+
+func _test_observed_escape_circuit_selects_takeoffs(game) -> void:
+	for case in [
+		{"lc4": 0.2, "lplc2": 0.9, "action": "FAST_TAKEOFF"},
+		{"lc4": 0.9, "lplc2": 0.1, "action": "BACKWARD_TAKEOFF"},
+		{"lc4": 0.9, "lplc2": 0.0, "action": "FORWARD_TAKEOFF"},
+	]:
+		var circuit := ConnectomeBrain.new()
+		var output: Dictionary = {}
+		var sensors := {
+			"lc4_left": case.lc4,
+			"lc4_right": case.lc4,
+			"lplc2_left": case.lplc2,
+			"lplc2_right": case.lplc2,
+			"proximity": 0.5,
+		}
+		for _step in range(30):
+			output = circuit.step(1.0 / 60.0, sensors)
+		game.fly.brain_output = output
+		_assert(game.fly._select_takeoff_action() == case.action, "observed contact ratios can select %s" % case.action)
+
+
+func _test_flight_turn_motif_steers_cruising(game) -> void:
+	game._start_round()
+	_assert(game.fly.turn_brain.is_loaded(), "separate MaleCNS flight-turn motif loads")
+	game.fly.global_position = Vector3(-0.50, 1.55, 2.90)
+	game.fly.state = FlyController.State.FLYING
+	game.fly.decision_time = 5.0
+	game.fly.wander_target = Vector3(-1.65, 1.60, 2.90)
+	game.fly.turn_pulse_timer = 5.0
+	game.fly.turn_pulse_remaining = 0.25
+	game.fly.turn_pulse_side = 1.0
+	game.fly.brain_output = {}
+	for _step in range(12):
+		game.fly._physics_process(1.0 / 60.0)
+	_assert(float(game.fly.turn_output.get("saccade_drive", 0.0)) > 0.2, "turn motif responds to spontaneous pulse")
+	_assert(float(game.fly.turn_output.get("turn_drive", 0.0)) > 0.2, "connectome-weighted spontaneous turn steers right")
+	_assert(game.fly.selected_action == "NONE", "ordinary turn does not masquerade as an escape")
 
 
 func _test_player_approach_threatens_fly(game) -> void:
@@ -216,8 +309,10 @@ func _test_fly_faces_its_actual_travel(game) -> void:
 
 
 func _test_fly_uses_compact_difficulty_scale(game) -> void:
-	_assert(FlyController.IMPORTED_FLY_SIZE <= 0.18, "fly model remains at the compact difficulty scale")
-	_assert(FlyController.BODY_RADIUS <= 0.052, "fly collision radius matches its smaller body")
+	_assert(FlyController.IMPORTED_FLY_SIZE <= 0.16, "fly model is slightly smaller")
+	_assert(FlyController.BODY_RADIUS <= 0.046, "fly collision radius matches its smaller body")
+	_assert(is_equal_approx(game.fly.architecture_shape.radius, FlyController.BODY_RADIUS), "architecture clearance uses the resized body")
+	_assert((game.fly.shadow.mesh as QuadMesh).size.is_equal_approx(Vector2(0.16, 0.115)), "fly shadow scales with the smaller model")
 	_assert(SwatterController.PADDLE_HALF_SIZE.x <= 0.361, "swatter strike area requires precise aim")
 
 
@@ -226,10 +321,18 @@ func _test_threat_telemetry(game) -> void:
 	game.fly.set_sensors(1.0 / 60.0, {
 		"loom_left": 0.70,
 		"loom_right": 0.15,
+		"lc4_left": 0.40,
+		"lplc2_left": 0.30,
 		"proximity": 0.8,
 	})
+	game.fly.turn_output = {"saccade_drive": 0.45, "straight_drive": 0.15}
+	game.fly.selected_action = "FLIGHT_SACCADE"
 	game.ui.update_hud(game.time_left, game.swings, game.escapes, 0.0, game.fly.get_activity(), game.fly.get_brain_mode(), game.fly.get_sensed_threat(), game.fly.get_circuit_response())
 	_assert(game.ui.activity_values["loom_left"].text == "0.70", "telemetry shows sensed threat rather than merged neural activity")
+	_assert(game.ui.activity_values["lc4"].text == "0.40", "telemetry distinguishes modeled angular speed")
+	_assert(game.ui.activity_values["lplc2"].text == "0.30", "telemetry distinguishes modeled apparent size")
+	_assert(game.ui.activity_values["turn_saccade"].text == "0.45", "telemetry shows the separate flight-turn response")
+	_assert(game.ui.action_label.text.contains("FLIGHT SACCADE"), "telemetry names the selected escape action")
 	_assert(game.ui.activity_values["dn_takeoff"].text != "", "telemetry shows descending-circuit response")
 	game.ui.set_telemetry_visible(false)
 	_assert(not game.ui.telemetry_panel.visible, "telemetry can be hidden for clean footage")
@@ -276,6 +379,8 @@ func _test_charge_up_does_not_alert_fly(game) -> void:
 	_assert(game.swatter.get_charge() > 0.5, "swatter builds a substantial charge")
 	_assert(game.fly.state == FlyController.State.PERCHED, "charging a swatter does not scare a stationary fly")
 	_assert(float(game.fly.brain_output.get("escape_drive", 0.0)) < 0.05, "windup adds no neural escape drive")
+	_assert(float(game.fly.sensed_threat.get("lc4_left", 0.0)) == 0.0, "windup adds no LC4 expansion signal")
+	_assert(float(game.fly.sensed_threat.get("lplc2_left", 0.0)) == 0.0, "windup adds no LPLC2 looming size signal")
 
 
 func _test_perched_fly_launches_before_impact(game) -> void:
@@ -298,7 +403,9 @@ func _test_perched_fly_launches_before_impact(game) -> void:
 		game.fly._physics_process(1.0 / 60.0)
 	_assert(game.swatter.phase == SwatterController.Phase.STRIKE, "fly reacts before the paddle reaches impact")
 	_assert(game.fly.state == FlyController.State.TAKEOFF, "descending swatter motion triggers a pre-impact escape")
-	_assert(game.fly.velocity.length() > FlyController.DODGE_SPEED, "perched escape starts with a higher speed burst")
+	_assert(float(game.fly.sensed_threat.get("lc4_left", 0.0)) > 0.0, "strike generates angular expansion for LC4")
+	_assert(float(game.fly.sensed_threat.get("lplc2_left", 0.0)) > 0.0, "strike generates apparent-size input for LPLC2")
+	_assert(game.fly.velocity.length() > FlyController.CRUISE_SPEED * 2.5, "perched escape starts with an action-specific burst")
 	_assert(game.fly.velocity.y > 0.0, "perched escape burst launches upward instead of into the surface")
 
 

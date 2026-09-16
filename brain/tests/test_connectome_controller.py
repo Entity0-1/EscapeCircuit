@@ -62,3 +62,30 @@ def test_checked_in_malecns_circuit_is_loadable() -> None:
         triggered |= output.trigger_escape
     assert triggered
     assert output.pitch_drive < 0.0
+
+
+def test_distinct_visual_channels_change_takeoff_latency() -> None:
+    def first_takeoff_tick(lc4: float, lplc2: float = 0.5) -> int:
+        controller = ConnectomeCircuitController(DEFAULT_CIRCUIT_PATH)
+        sensors = Sensors(
+            loom_left=0.0,
+            loom_right=0.0,
+            proximity=0.55,
+            impact=0.0,
+            lc4_left=lc4 * 0.5,
+            lc4_right=lc4 * 0.5,
+            lplc2_left=lplc2,
+            lplc2_right=lplc2,
+        )
+        for tick in range(1, 121):
+            output, activity = controller.step(1 / 60, sensors)
+            assert activity["lc4"] == lc4 * 0.5
+            assert activity["lplc2"] == lplc2
+            if output.takeoff_drive > 0.24:
+                return tick
+        return 121
+
+    slow_tick = first_takeoff_tick(0.25)
+    fast_tick = first_takeoff_tick(0.5)
+    assert fast_tick < slow_tick < 121
+    assert fast_tick < first_takeoff_tick(0.5, 0.35) < 121

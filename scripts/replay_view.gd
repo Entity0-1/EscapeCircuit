@@ -70,16 +70,16 @@ func show_frame(frame: Dictionary, progress: float, seconds: float) -> void:
 	var sensed: Dictionary = frame.get("sensed", {})
 	var response: Dictionary = frame.get("response", {})
 	var activity: Dictionary = response.get("activity", {})
-	threat_label.text = "MODELED LOOM  L %.2f  /  R %.2f" % [
-		float(sensed.get("loom_left", 0.0)),
-		float(sensed.get("loom_right", 0.0)),
+	threat_label.text = "LC4 SPEED %.2f  /  LPLC2 SIZE %.2f" % [
+		maxf(float(sensed.get("lc4_left", 0.0)), float(sensed.get("lc4_right", 0.0))),
+		maxf(float(sensed.get("lplc2_left", 0.0)), float(sensed.get("lplc2_right", 0.0))),
 	]
 	var takeoff_caption := "DNp01" if str(response.get("mode", "")) == "MALECNS SENSORIMOTOR" else "TAKEOFF"
-	circuit_label.text = "%s %.2f    ESCAPE %.2f    YAW %+.2f" % [
+	circuit_label.text = "%s %.2f    ESCAPE %.2f    %s" % [
 		takeoff_caption,
 		float(activity.get("dn_takeoff", response.get("takeoff_drive", 0.0))),
 		float(response.get("escape_drive", 0.0)),
-		float(response.get("yaw_drive", 0.0)),
+		str(response.get("selected_action", "NONE")).replace("_", " "),
 	]
 
 

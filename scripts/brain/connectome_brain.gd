@@ -50,11 +50,17 @@ func step(delta: float, sensors: Dictionary) -> Dictionary:
 	var loom_up := clampf(float(sensors.get("loom_up", 0.0)), 0.0, 1.0)
 	var loom_down := clampf(float(sensors.get("loom_down", 0.0)), 0.0, 1.0)
 	var alpha := 1.0 - exp(-RESPONSE_RATE * delta)
+	# Legacy inputs remain supported for recorded/test callers; live gameplay
+	# supplies separate angular-speed (LC4) and size (LPLC2) feature channels.
+	var lc4_left := clampf(float(sensors.get("lc4_left", loom_left)), 0.0, 1.0)
+	var lc4_right := clampf(float(sensors.get("lc4_right", loom_right)), 0.0, 1.0)
+	var lplc2_left := clampf(float(sensors.get("lplc2_left", loom_left * (0.72 + proximity * 0.28))), 0.0, 1.0)
+	var lplc2_right := clampf(float(sensors.get("lplc2_right", loom_right * (0.72 + proximity * 0.28))), 0.0, 1.0)
 	var source_activity := {
-		"LC4:L": loom_left,
-		"LC4:R": loom_right,
-		"LPLC2:L": loom_left * (0.72 + proximity * 0.28),
-		"LPLC2:R": loom_right * (0.72 + proximity * 0.28),
+		"LC4:L": lc4_left,
+		"LC4:R": lc4_right,
+		"LPLC2:L": lplc2_left,
+		"LPLC2:R": lplc2_right,
 	}
 
 	for target_key in contacts:
@@ -74,6 +80,13 @@ func step(delta: float, sensors: Dictionary) -> Dictionary:
 	var right_directional := _maximum_activity(DIRECTIONAL_TARGETS, "R")
 	var left_collision := _maximum_activity(COLLISION_TARGETS, "L")
 	var right_collision := _maximum_activity(COLLISION_TARGETS, "R")
+	var left_backward := (_activity("DNp02", "L") + _activity("DNp04", "L")) * 0.5
+	var right_backward := (_activity("DNp02", "R") + _activity("DNp04", "R")) * 0.5
+	var backward_takeoff := maxf(left_backward, right_backward)
+	var forward_takeoff := maxf(_activity("DNp11", "L"), _activity("DNp11", "R"))
+	var left_saccade := _activity("DNp03", "L")
+	var right_saccade := _activity("DNp03", "R")
+	var flight_saccade := maxf(left_saccade, right_saccade)
 	var evasive := maxf(left_collision, right_collision)
 	var fast := maxf(left_fast, right_fast)
 	var directional := maxf(left_directional, right_directional)
@@ -104,6 +117,11 @@ func step(delta: float, sensors: Dictionary) -> Dictionary:
 		"turn_bias": yaw_drive,
 		"forward_drive": minf(1.0, 0.58 + flight_power * 0.42),
 		"takeoff_drive": takeoff_drive,
+		"fast_takeoff_drive": fast,
+		"backward_takeoff_drive": backward_takeoff,
+		"forward_takeoff_drive": forward_takeoff,
+		"flight_saccade_drive": flight_saccade,
+		"saccade_side": clampf(left_saccade - right_saccade, -1.0, 1.0),
 		"yaw_drive": yaw_drive,
 		"pitch_drive": clampf(pitch_drive, -1.0, 1.0),
 		"roll_drive": roll_drive,
@@ -113,7 +131,12 @@ func step(delta: float, sensors: Dictionary) -> Dictionary:
 		"activity": {
 			"visual_left": maxf(loom_left, left_fast),
 			"visual_right": maxf(loom_right, right_fast),
+			"lc4": maxf(lc4_left, lc4_right),
+			"lplc2": maxf(lplc2_left, lplc2_right),
 			"dn_takeoff": fast,
+			"dn_backward": backward_takeoff,
+			"dn_forward": forward_takeoff,
+			"dn_saccade": flight_saccade,
 			"escape": escape_drive,
 			"motor": minf(1.0, maxf(absf(yaw_drive), maxf(absf(pitch_drive), flight_power * escape_drive))),
 		},

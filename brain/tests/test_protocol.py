@@ -27,6 +27,26 @@ def test_request_round_trip_shape() -> None:
     assert request.sensors.loom_left == 0.75
 
 
+def test_optional_visual_features_round_trip_and_validate() -> None:
+    base = {
+        "protocol": 1,
+        "sequence": 43,
+        "dt_ms": 16.667,
+        "sensors": {
+            "lc4_left": 0.7,
+            "lc4_right": 0.1,
+            "lplc2_left": 0.4,
+            "lplc2_right": 0.2,
+        },
+    }
+    request = StepRequest.from_json(json.dumps(base).encode())
+    assert request.sensors.lc4_left == 0.7
+    assert request.sensors.lplc2_right == 0.2
+    base["sensors"]["lc4_left"] = 1.1
+    with pytest.raises(ValueError, match="lc4_left"):
+        StepRequest.from_json(json.dumps(base).encode())
+
+
 def test_response_is_compact_json_line() -> None:
     response = StepResponse(
         sequence=2,
@@ -44,4 +64,3 @@ def test_response_is_compact_json_line() -> None:
 def test_request_rejects_wrong_protocol() -> None:
     with pytest.raises(ValueError, match="protocol"):
         StepRequest.from_json(b'{"protocol":99,"sequence":0,"dt_ms":16,"sensors":{}}')
-

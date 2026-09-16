@@ -23,6 +23,7 @@ var charge_fill: ColorRect
 var activity_fills: Dictionary = {}
 var activity_values: Dictionary = {}
 var dn_caption: Label
+var action_label: Label
 var intro_panel: PanelContainer
 var result_panel: PanelContainer
 var result_title: Label
@@ -46,15 +47,20 @@ func update_hud(time_left: float, swings: int, escapes: int, charge: float, acti
 	status_label.text = mode
 	dn_caption.text = "DNp01" if mode == "MALECNS SENSORIMOTOR" else "TAKEOFF"
 	if mode == "MALECNS SENSORIMOTOR":
-		attribution_label.text = "NEURAL MODE: MALECNS v1.0 SENSORIMOTOR CIRCUIT  •  CC BY 4.0"
+		attribution_label.text = "NEURAL MODE: MALECNS v1.0 ESCAPE + TURN CIRCUITS  •  CC BY 4.0"
 	else:
 		attribution_label.text = "NEURAL MODE: CONNECTOME-INSPIRED PLACEHOLDER"
 	_set_activity("loom_left", float(sensed.get("loom_left", 0.0)))
 	_set_activity("loom_right", float(sensed.get("loom_right", 0.0)))
+	_set_activity("lc4", maxf(float(sensed.get("lc4_left", 0.0)), float(sensed.get("lc4_right", 0.0))))
+	_set_activity("lplc2", maxf(float(sensed.get("lplc2_left", 0.0)), float(sensed.get("lplc2_right", 0.0))))
 	_set_activity("dn_takeoff", float(activity.get("dn_takeoff", response.get("takeoff_drive", 0.0))))
 	_set_activity("escape", float(response.get("escape_drive", activity.get("escape", 0.0))))
 	var turn := float(response.get("yaw_drive", 0.0))
 	_set_activity("turn", absf(turn), "L" if turn < -0.01 else ("R" if turn > 0.01 else "–"))
+	_set_activity("turn_saccade", float(activity.get("turn_saccade", 0.0)))
+	_set_activity("turn_straight", float(activity.get("turn_straight", 0.0)))
+	action_label.text = "ACTION  %s" % str(response.get("selected_action", "NONE")).replace("_", " ")
 
 
 func set_telemetry_visible(enabled: bool) -> void:
@@ -142,8 +148,8 @@ func _build_interface() -> void:
 
 	telemetry_panel = PanelContainer.new()
 	telemetry_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	telemetry_panel.position = Vector2(28, -256)
-	telemetry_panel.size = Vector2(340, 222)
+	telemetry_panel.position = Vector2(28, -382)
+	telemetry_panel.size = Vector2(400, 348)
 	telemetry_panel.add_theme_stylebox_override("panel", _panel_style(PANEL, 12, Color(0.28, 0.48, 0.46, 0.42), 1))
 	root.add_child(telemetry_panel)
 	var brain_margin := MarginContainer.new()
@@ -162,6 +168,8 @@ func _build_interface() -> void:
 	brain_vbox.add_child(brain_title)
 	_add_activity_row(brain_vbox, "LEFT", "loom_left", TEAL)
 	_add_activity_row(brain_vbox, "RIGHT", "loom_right", TEAL)
+	_add_activity_row(brain_vbox, "LC4 / SPEED", "lc4", TEAL)
+	_add_activity_row(brain_vbox, "LPLC2 / SIZE", "lplc2", TEAL)
 	var circuit_title := Label.new()
 	circuit_title.text = "CIRCUIT RESPONSE / CONNECTOME-WEIGHTED"
 	circuit_title.add_theme_font_size_override("font_size", 11)
@@ -170,6 +178,17 @@ func _build_interface() -> void:
 	_add_activity_row(brain_vbox, "DNp01", "dn_takeoff", ORANGE)
 	_add_activity_row(brain_vbox, "ESCAPE", "escape", ORANGE)
 	_add_activity_row(brain_vbox, "TURN", "turn", RED)
+	var flight_title := Label.new()
+	flight_title.text = "SPONTANEOUS TURN / MALECNS MOTIF"
+	flight_title.add_theme_font_size_override("font_size", 11)
+	flight_title.add_theme_color_override("font_color", MUTED)
+	brain_vbox.add_child(flight_title)
+	_add_activity_row(brain_vbox, "SACCADE", "turn_saccade", ORANGE)
+	_add_activity_row(brain_vbox, "STRAIGHT", "turn_straight", TEAL)
+	action_label = Label.new()
+	action_label.add_theme_font_size_override("font_size", 11)
+	action_label.add_theme_color_override("font_color", INK)
+	brain_vbox.add_child(action_label)
 
 	var charge_panel := PanelContainer.new()
 	charge_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -285,7 +304,7 @@ func _add_activity_row(parent: VBoxContainer, caption: String, key: String, colo
 	parent.add_child(row)
 	var label := Label.new()
 	label.text = caption
-	label.custom_minimum_size = Vector2(54, 14)
+	label.custom_minimum_size = Vector2(100, 14)
 	label.add_theme_font_size_override("font_size", 10)
 	label.add_theme_color_override("font_color", MUTED)
 	row.add_child(label)

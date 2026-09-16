@@ -44,3 +44,13 @@ uv run --project brain escape-circuit-extract
 ```
 
 The command writes both a complete ignored report and the small tracked runtime artifact. They list observed direct connections from the looming-sensitive LPLC2 and LC4 populations to annotated descending neurons. Extraction does not infer neural dynamics or behavior.
+
+## Extract the spontaneous-flight-turn motif
+
+The same verified annotations and complete edge table can produce the separate six-neuron VES041/DNa15/DNb01 runtime artifact:
+
+```powershell
+uv run --project brain python -m escape_circuit_brain.turn_circuit
+```
+
+The checked-in artifact contains only observed contacts among those six neurons. The Godot flight-turn controller supplies modeled tonic and turn-pulse inputs; no spontaneous activity or behavior was measured by the connectome.

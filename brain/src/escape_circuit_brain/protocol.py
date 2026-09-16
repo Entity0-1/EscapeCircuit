@@ -25,6 +25,10 @@ class Sensors:
     impact: float
     loom_up: float = 0.0
     loom_down: float = 0.0
+    lc4_left: float | None = None
+    lc4_right: float | None = None
+    lplc2_left: float | None = None
+    lplc2_right: float | None = None
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any]) -> Sensors:
@@ -35,6 +39,14 @@ class Sensors:
             impact=_bounded(value.get("impact", 0.0), "impact"),
             loom_up=_bounded(value.get("loom_up", 0.0), "loom_up"),
             loom_down=_bounded(value.get("loom_down", 0.0), "loom_down"),
+            lc4_left=_bounded(value["lc4_left"], "lc4_left") if "lc4_left" in value else None,
+            lc4_right=_bounded(value["lc4_right"], "lc4_right") if "lc4_right" in value else None,
+            lplc2_left=(
+                _bounded(value["lplc2_left"], "lplc2_left") if "lplc2_left" in value else None
+            ),
+            lplc2_right=(
+                _bounded(value["lplc2_right"], "lplc2_right") if "lplc2_right" in value else None
+            ),
         )
 
 
@@ -72,6 +84,11 @@ class BrainOutput:
     roll_drive: float = 0.0
     flight_power: float = 0.5
     landing_drive: float = 0.0
+    fast_takeoff_drive: float = 0.0
+    backward_takeoff_drive: float = 0.0
+    forward_takeoff_drive: float = 0.0
+    flight_saccade_drive: float = 0.0
+    saccade_side: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)

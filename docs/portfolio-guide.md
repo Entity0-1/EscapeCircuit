@@ -2,14 +2,14 @@
 
 ## One-sentence pitch
 
-Escape Circuit turns a version-locked fruit-fly connectome circuit into the evasive controller of a polished, self-contained 3D game.
+Escape Circuit turns two version-locked fruit-fly connectome subcircuits into escape-action and spontaneous-turn controllers for a self-contained 3D game.
 
 ## What this demonstrates
 
 - Product engineering: a complete interaction loop, visual hierarchy, procedural animation and audio, pause/restart states, and release packaging.
 - Systems design: a stable provider interface with in-process, fallback, and non-blocking loopback implementations.
-- Data engineering: checksummed 1.1 GB source data is streamed into a compact, reviewable runtime artifact.
-- Simulation engineering: observed connectivity is decoded into continuous takeoff, yaw, pitch, roll, flight-power, and landing channels that drive Godot biomechanics.
+- Data engineering: checksummed 1.1 GB source data is scanned into two compact, reviewable runtime artifacts.
+- Simulation engineering: observed connectivity influences distinct escape actions and spontaneous-turn suppression, while Godot handles navigation and biomechanics.
 - Scientific integrity: measured connectivity and engineered simulation choices are separated in code, telemetry, and documentation.
 - Quality engineering: deterministic controller tests, scene-level integration tests, Python unit tests, linting, type checking, and CI.
 
@@ -26,7 +26,7 @@ Escape Circuit turns a version-locked fruit-fly connectome circuit into the evas
 1. State the challenge: can a controller derived from a fly connectome escape a human player?
 2. Show one clean gameplay round and the live modeled-threat/circuit-response display, then press V for the last-twelve-seconds replay.
 3. Explain the scientific boundary in one sentence; avoid calling it a whole fly brain.
-4. Show that the original 1.1 GB graph becomes a tiny checked artifact with exact provenance.
+4. Show that the original 1.1 GB graph becomes two small, checked artifacts with exact provenance; compare intact and VES041-ablated turn responses.
 5. End on the architecture, tests, and public download link.
 
 ## Resume bullet template
