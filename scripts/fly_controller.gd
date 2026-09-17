@@ -363,7 +363,6 @@ func _update_flight_behavior(delta: float) -> void:
 	var bob := Vector3.UP * sin(state_time * 8.5) * 0.12
 	var cruise_scale := lerpf(0.88, 1.13, _motor_value("flight_power", 0.48))
 	var target_velocity := desired_direction * CRUISE_SPEED * cruise_scale
-	target_velocity.y *= VERTICAL_CRUISE_MULTIPLIER
 	var steering_rate := 12.0 if absf(spontaneous_turn) > 0.22 else 4.8
 	velocity = velocity.lerp(target_velocity + bob, 1.0 - exp(-steering_rate * delta))
 	var previous_position := global_position
