@@ -309,10 +309,10 @@ func _test_fly_faces_its_actual_travel(game) -> void:
 
 
 func _test_fly_uses_compact_difficulty_scale(game) -> void:
-	_assert(FlyController.IMPORTED_FLY_SIZE <= 0.16, "fly model is slightly smaller")
-	_assert(FlyController.BODY_RADIUS <= 0.046, "fly collision radius matches its smaller body")
+	_assert(is_equal_approx(FlyController.IMPORTED_FLY_SIZE, 0.08), "fly model is half its previous size")
+	_assert(is_equal_approx(FlyController.BODY_RADIUS, 0.023), "fly collision radius is halved with its body")
 	_assert(is_equal_approx(game.fly.architecture_shape.radius, FlyController.BODY_RADIUS), "architecture clearance uses the resized body")
-	_assert((game.fly.shadow.mesh as QuadMesh).size.is_equal_approx(Vector2(0.16, 0.115)), "fly shadow scales with the smaller model")
+	_assert((game.fly.shadow.mesh as QuadMesh).size.is_equal_approx(Vector2(0.08, 0.0575)), "fly shadow is halved with the smaller model")
 	_assert(SwatterController.PADDLE_HALF_SIZE.x <= 0.361, "swatter strike area requires precise aim")
 
 
